@@ -10,19 +10,19 @@
 using namespace std;
 
 const int N = 50;
-const double INF = 1e+19;
+const int INF = 1e+6;
 typedef pair < int, int > Edge;
 
 struct PartialSolution
 {
 	int n = -1;
-	double Cost = INF;
-	double LowerBound = 0.0;
-	double Reduced[N][N];
+	int32_t Cost = INF;
+	int32_t LowerBound = 0.0;
+	int32_t Reduced[N][N];
 	int8_t Constraints[N][N];
 	vector<int> Path;
 
-	PartialSolution WithEdge(Edge pivot, double D[N][N])
+	PartialSolution WithEdge(Edge pivot, int32_t D[N][N])
 	{
 		int i = pivot.first, j = pivot.second;
 		
@@ -39,7 +39,7 @@ struct PartialSolution
 		return child;
 	}
 
-	PartialSolution WithoutEdge(Edge pivot, double D[N][N])
+	PartialSolution WithoutEdge(Edge pivot, int32_t D[N][N])
 	{
 		int i = pivot.first, j = pivot.second;
 		
@@ -59,10 +59,11 @@ struct PartialSolution
 
 	Edge ChoosePivotEdge()
 	{
-		auto rowMin = [&](int k) {return *min_element(Reduced[k], Reduced[k] + n); };
-		auto columnMin = [&](int k) {return (*min_element(Reduced, Reduced + n, [=](double* l, double* r) {return l[k] < r[k]; }))[k]; };
+		auto minStride = [&](int32_t* begin, int32_t* end, int stride) {int32_t m = INF; for (int32_t* p = begin; p < end; p += stride) if (*p < m) m = *p; return m; };
+		auto rowMin = [&](int k) { return minStride(&Reduced[k][0], &Reduced[k][n], 1); };
+		auto columnMin = [&](int k) { return minStride(&Reduced[0][k], &Reduced[n-1][n-1], N); };
 		
-		double bestIncrease = 0.0;
+		int bestIncrease = 0.0;
 		Edge bestPivot = make_pair(-1, -1);
 		for (int i = 0; i < n; i++)
 		{
@@ -71,7 +72,7 @@ struct PartialSolution
 				if (Constraints[i][j] == 0 && Reduced[i][j] == 0.0)
 				{
 					Reduced[i][j] = INF;
-					double increase = rowMin(i) + columnMin(j);
+					int increase = rowMin(i) + columnMin(j);
 					if (increase > bestIncrease)
 					{
 						bestIncrease = increase;
@@ -126,17 +127,17 @@ struct PartialSolution
 	void Reduce()
 	{
 		for (int i = 0; i < n; i++)
-			Reduce("row", i);
+			Reduce(Row, i);
 
 		for (int j = 0; j < n; j++)
-			Reduce("column", j);
+			Reduce(Column, j);
 	}
 
-	void Reduce(const char* reductionType, int i)
+	void Reduce(PartialSolution::ReductionType reductionType, int i)
 	{
-		auto accessor = [&](int a, int b) -> double& {return reductionType == "row" ? Reduced[a][b] : Reduced[b][a]; };
+		auto accessor = [&](int a, int b) -> int& {return reductionType == Row? Reduced[a][b] : Reduced[b][a]; };
 
-		double m = INF;
+		int m = INF;
 		for (int j = 0; j < n; j++)
 			m = min(m, accessor(i, j));
 		for (int j = 0; j < n; j++)
@@ -144,7 +145,7 @@ struct PartialSolution
 		LowerBound += m;
 	}
 
-	PartialSolution(int n, double D[N][N]) : n(n)
+	PartialSolution(int n, int32_t D[N][N]) : n(n)
 	{
 		memcpy(Reduced, D, sizeof(Reduced[0][0]) * N * N);
 		memset(Constraints, 0, sizeof(Constraints[0][0]) * N * N);
@@ -158,9 +159,15 @@ struct PartialSolution
 	{
 
 	}
+
+	enum ReductionType
+	{
+		Row,
+		Column
+	};
 };
 
-void branch_and_bound(int n, double D[N][N])
+void branch_and_bound(int n, int32_t D[N][N])
 {
 	PartialSolution bestCompleteSolution;
 	PartialSolution root(n, D);
@@ -196,31 +203,17 @@ void branch_and_bound(int n, double D[N][N])
 	}
 }
 
-struct A
-{
-	int B[2];
-
-	A()
-	{
-		B[0] = B[1] = 0;
-	}
-};
-
 int main()
 {
-	A a;
-	A b = a;
-	return 0;
-
 	freopen("input.txt", "r", stdin);
 
 	int n;
-	double D[N][N];
+	int32_t D[N][N];
 
 	scanf("%d", &n);
 	for (int i = 0; i < n; i++)
 		for (int j = 0; j < n; j++)
-			scanf("%lf", &D[i][j]);
+			scanf("%d", &D[i][j]);
 
 	branch_and_bound(n, D);
 }
