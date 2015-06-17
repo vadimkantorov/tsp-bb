@@ -15,6 +15,12 @@ typedef pair < int, int > Edge;
 
 struct PartialSolution
 {
+	enum class ReductionType
+	{
+		Row,
+		Column,
+	};
+
 	int n = -1;
 	int32_t Cost = INF;
 	int32_t LowerBound = 0.0;
@@ -46,8 +52,8 @@ struct PartialSolution
 		PartialSolution child = *this;
 		child.Constraints[i][j] = child.Constraints[j][i] = -1;
 		child.Reduced[i][j] = child.Reduced[j][i] = INF;
-		child.Reduce("row", i);
-		child.Reduce("column", j);
+		child.Reduce(ReductionType::Row, i);
+		child.Reduce(ReductionType::Column, j);
 
 		return child;
 	}
@@ -88,7 +94,7 @@ struct PartialSolution
 
 	void Print()
 	{
-		printf("cost: %8.2f [0", Cost);
+		printf("cost: %d [0", Cost);
 		for (int i = 1; i < n; i++)
 			printf("->%d", Path[i]);
 		puts("]");
@@ -109,7 +115,7 @@ struct PartialSolution
 			{
 				if (j != from && Constraints[from][j] == 1)
 				{
-					if (visited.at(j) || to != -1)
+					if (visited[j] || to != -1)
 						return false;
 
 					to = j;
@@ -127,15 +133,15 @@ struct PartialSolution
 	void Reduce()
 	{
 		for (int i = 0; i < n; i++)
-			Reduce(Row, i);
+			Reduce(ReductionType::Row, i);
 
 		for (int j = 0; j < n; j++)
-			Reduce(Column, j);
+			Reduce(ReductionType::Column, j);
 	}
 
 	void Reduce(PartialSolution::ReductionType reductionType, int i)
 	{
-		auto accessor = [&](int a, int b) -> int& {return reductionType == Row? Reduced[a][b] : Reduced[b][a]; };
+		auto accessor = [&](int a, int b) -> int& {return reductionType == ReductionType::Row? Reduced[a][b] : Reduced[b][a]; };
 
 		int m = INF;
 		for (int j = 0; j < n; j++)
@@ -159,12 +165,6 @@ struct PartialSolution
 	{
 
 	}
-
-	enum ReductionType
-	{
-		Row,
-		Column
-	};
 };
 
 void branch_and_bound(int n, int32_t D[N][N])
