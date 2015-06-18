@@ -11,37 +11,25 @@ using namespace std;
 const size_t N = 50;
 const uint32_t INF = uint32_t(1e+9);
 
-struct Edge
+typedef pair < size_t, size_t > Edge;
+Edge NullEdge(N, N);
+
+enum class EdgeType
 {
-	int i, j;
-	enum class Type
-	{
-		Outgoing,
-		Incoming
-	};
-
-	Edge(size_t i = N, size_t j = N) : i(i), j(j)
-	{
-	}
-
-	bool IsNull()
-	{
-		return i == N && j == N;
-	}
+	Outgoing,
+	Incoming
 };
 
 struct PartialSolution
 {
-	size_t n = 0;
-	uint32_t Cost = INF;
-	uint32_t LowerBoundTimesTwo = 0;
-	uint32_t Reduced[N][N];
-	int8_t Constraints[N][N];
-	vector<size_t> Path;
+	bool operator>(const PartialSolution& other) const
+	{
+		return LowerBoundTimesTwo > other.LowerBoundTimesTwo;
+	}
 
 	PartialSolution WithEdge(Edge pivot, uint32_t D[N][N])
 	{
-		auto i = pivot.i, j = pivot.j;
+		auto i = pivot.first, j = pivot.second;
 		
 		PartialSolution child = *this;
 		child.Cost += D[i][j];
@@ -54,8 +42,8 @@ struct PartialSolution
 		child.Constraints[i][j] = 1;
 		child.Constraints[j][i] = -1;
 
-		auto subpathTo = child.TraverseSubPath(i, Edge::Type::Outgoing);
-		auto subpathFrom = child.TraverseSubPath(i, Edge::Type::Incoming);
+		auto subpathTo = child.TraverseSubPath(i, EdgeType::Outgoing);
+		auto subpathFrom = child.TraverseSubPath(i, EdgeType::Incoming);
 		if (subpathTo.size() + subpathFrom.size() - 1 != n)
 		{
 			child.Constraints[subpathTo.back()][subpathFrom.back()] = -1;
@@ -68,20 +56,15 @@ struct PartialSolution
 
 	PartialSolution WithoutEdge(Edge pivot, uint32_t D[N][N])
 	{
-		auto i = pivot.i, j = pivot.j;
+		auto i = pivot.first, j = pivot.second;
 		
 		PartialSolution child = *this;
 		child.Constraints[i][j] = -1;
 		child.Reduced[i][j] = INF;
-		child.Reduce(Edge::Type::Outgoing, i);
-		child.Reduce(Edge::Type::Incoming, j);
+		child.Reduce(EdgeType::Outgoing, i);
+		child.Reduce(EdgeType::Incoming, j);
 
 		return child;
-	}
-
-	bool operator>(const PartialSolution& other) const
-	{
-		return LowerBoundTimesTwo > other.LowerBoundTimesTwo;
 	}
 
 	Edge ChoosePivotEdge()
@@ -91,7 +74,7 @@ struct PartialSolution
 		auto columnMin = [&](size_t k) {return minStride(k, 1); };
 		
 		uint32_t bestIncrease = 0;
-		Edge bestPivot;
+		Edge bestPivot = NullEdge;
 		for (size_t i = 0; i < n; i++)
 		{
 			for (size_t j = 0; j < n; j++)
@@ -113,17 +96,9 @@ struct PartialSolution
 		return bestPivot;
 	}
 
-	void Print(uint32_t D[N][N])
+	vector<size_t> TraverseSubPath(size_t cur, EdgeType edgeType)
 	{
-		printf("%d\n", Cost - D[n-1][0]);
-		for (size_t i = 1; i < n; i++)
-			printf("%d %d %d\n", Path[i-1], Path[i], D[Path[i-1]][Path[i]]);
-		printf("\n\n");
-	}
-
-	vector<size_t> TraverseSubPath(size_t cur, Edge::Type edgeType)
-	{
-		auto stride = edgeType == Edge::Type::Outgoing ? 1 : N;
+		auto stride = edgeType == EdgeType::Outgoing ? 1 : N;
 		vector<size_t> subpath{ cur };
 		for (size_t k = 0; k < n; k++)
 		{
@@ -146,24 +121,9 @@ struct PartialSolution
 		return subpath;
 	}
 
-	bool IsComplete()
+	void Reduce(EdgeType edgeType, size_t i)
 	{
-		Path = TraverseSubPath(0, Edge::Type::Outgoing);
-		return Path.size() == n + 1 && Path[n - 1] == n - 1;
-	}
-
-	void Reduce()
-	{
-		for (size_t i = 0; i < n; i++)
-			Reduce(Edge::Type::Outgoing, i);
-
-		for (size_t j = 0; j < n; j++)
-			Reduce(Edge::Type::Incoming, j);
-	}
-
-	void Reduce(Edge::Type edgeType, size_t i)
-	{
-		auto kStride = edgeType == Edge::Type::Outgoing ? 1 : N;
+		auto kStride = edgeType == EdgeType::Outgoing ? 1 : N;
 		
 		uint32_t m = INF;
 		for (size_t k = 0; k < n; k++)
@@ -176,6 +136,29 @@ struct PartialSolution
 				*(&Reduced[0][0] + IK(i, k, kStride)) -= m;
 			LowerBoundTimesTwo += m;
 		}
+	}
+
+	void Reduce()
+	{
+		for (size_t i = 0; i < n; i++)
+			Reduce(EdgeType::Outgoing, i);
+
+		for (size_t j = 0; j < n; j++)
+			Reduce(EdgeType::Incoming, j);
+	}
+
+	void Print(uint32_t D[N][N])
+	{
+		printf("%d\n", Cost - D[n - 1][0]);
+		for (size_t i = 1; i < n; i++)
+			printf("%d %d %d\n", Path[i - 1], Path[i], D[Path[i - 1]][Path[i]]);
+		printf("\n\n");
+	}
+
+	bool IsComplete()
+	{
+		Path = TraverseSubPath(0, EdgeType::Outgoing);
+		return Path.size() == n + 1 && Path[n - 1] == n - 1;
 	}
 
 	int IK(size_t i, size_t k, size_t kStride)
@@ -201,6 +184,13 @@ struct PartialSolution
 	{
 
 	}
+
+	size_t n = 0;
+	uint32_t Cost = INF;
+	uint32_t LowerBoundTimesTwo = 0;
+	uint32_t Reduced[N][N];
+	int8_t Constraints[N][N];
+	vector<size_t> Path;
 };
 
 void branch_and_bound(size_t n, uint32_t D[N][N])
@@ -227,7 +217,7 @@ void branch_and_bound(size_t n, uint32_t D[N][N])
 		else if (currentSolution.LowerBoundTimesTwo < 2 * bestCompleteSolution.Cost)
 		{
 			auto pivot = currentSolution.ChoosePivotEdge();
-			if (!pivot.IsNull())
+			if (pivot != NullEdge)
 			{
 				auto withPivot = currentSolution.WithEdge(pivot, D);
 				auto withoutPivot = currentSolution.WithoutEdge(pivot, D);
