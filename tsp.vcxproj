@@ -13,9 +13,6 @@
   <ItemGroup>
     <ClCompile Include="tsp.cpp" />
   </ItemGroup>
-  <ItemGroup>
-    <Text Include="input.txt" />
-  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{0284919A-22BC-4CB5-9595-1F0C0D7532A4}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>

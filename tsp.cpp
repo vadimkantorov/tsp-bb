@@ -9,9 +9,9 @@
 #include <utility>
 using namespace std;
 
-const int N = 50;
-const int INF = 1e+6;
-typedef pair < int, int > Edge;
+const size_t N = 50;
+const uint32_t INF = uint32_t(1e+6);
+typedef pair < size_t, size_t > Edge;
 
 struct PartialSolution
 {
@@ -21,37 +21,70 @@ struct PartialSolution
 		Column,
 	};
 
-	int n = -1;
-	int32_t Cost = INF;
-	int32_t LowerBound = 0.0;
-	int32_t Reduced[N][N];
+	size_t n = 0;
+	uint32_t Cost = INF;
+	uint32_t LowerBoundTimesTwo = 0;
+	uint32_t Reduced[N][N];
 	int8_t Constraints[N][N];
-	vector<int> Path;
+	vector<size_t> Path;
 
-	PartialSolution WithEdge(Edge pivot, int32_t D[N][N])
+	
+
+	PartialSolution WithEdge(Edge pivot, uint32_t D[N][N])
 	{
-		int i = pivot.first, j = pivot.second;
+		auto i = pivot.first, j = pivot.second;
 		
 		PartialSolution child = *this;
 		child.Cost += D[i][j];
-		for (int k = 0; k < n; k++)
+		for (size_t k = 0; k < n; k++)
 		{
 			child.Constraints[i][k] = child.Constraints[k][j] = -1;
 			child.Reduced[i][k] = child.Reduced[k][j] = INF;
 		}
+
+		child.Constraints[i][j] = 1;
+		child.Constraints[j][i] = -1;
+
+		auto traverseSubPath = [&](size_t cur, int stride)
+		{
+			vector<size_t> subpath{ cur };
+			while (true)
+			{
+				size_t next = N;
+				for (size_t i = 0; i < n; i++)
+				{
+					if (*(&child.Constraints[0][0] + IK(cur, i, stride)) == 1)
+					{
+						next = i;
+						break;
+					}
+				}
+
+				if (next == N)
+					break;
+
+				subpath.push_back(next);
+				cur = next;
+			}
+			return subpath;
+		};
+
+		auto subpathTo = traverseSubPath(i, 1);
+		auto subpathFrom = traverseSubPath(i, N);
+
+		child.Constraints[subpathTo.back()][subpathFrom.back()] = -1;
+		child.Reduced[subpathTo.back()][subpathFrom.back()] = INF;
 		child.Reduce();
-		child.Constraints[i][j] = child.Constraints[j][i] = 1;
-		
 		return child;
 	}
 
-	PartialSolution WithoutEdge(Edge pivot, int32_t D[N][N])
+	PartialSolution WithoutEdge(Edge pivot, uint32_t D[N][N])
 	{
-		int i = pivot.first, j = pivot.second;
+		auto i = pivot.first, j = pivot.second;
 		
 		PartialSolution child = *this;
-		child.Constraints[i][j] = child.Constraints[j][i] = -1;
-		child.Reduced[i][j] = child.Reduced[j][i] = INF;
+		child.Constraints[i][j] = -1;
+		child.Reduced[i][j] = INF;
 		child.Reduce(ReductionType::Row, i);
 		child.Reduce(ReductionType::Column, j);
 
@@ -65,26 +98,26 @@ struct PartialSolution
 
 	Edge ChoosePivotEdge()
 	{
-		auto minStride = [&](int32_t* begin, int32_t* end, int stride) {int32_t m = INF; for (int32_t* p = begin; p < end; p += stride) if (*p < m) m = *p; return m; };
-		auto rowMin = [&](int k) { return minStride(&Reduced[k][0], &Reduced[k][n], 1); };
-		auto columnMin = [&](int k) { return minStride(&Reduced[0][k], &Reduced[n-1][n-1], N); };
+		auto minStride = [&](size_t k, size_t kStride) {uint32_t m = INF; for (size_t i = 0; i < n; i++) m = min(m, *(&Reduced[0][0] + IK(i, k, kStride))); return m;  };
+		auto rowMin = [&](size_t k) {return minStride(k, N); };
+		auto columnMin = [&](size_t k) {return minStride(k, 1); };
 		
-		int bestIncrease = 0.0;
+		uint32_t bestIncrease = 0;
 		Edge bestPivot = make_pair(-1, -1);
-		for (int i = 0; i < n; i++)
+		for (size_t i = 0; i < n; i++)
 		{
-			for (int j = 0; j < n; j++)
+			for (size_t j = 0; j < n; j++)
 			{
-				if (Constraints[i][j] == 0 && Reduced[i][j] == 0.0)
+				if (Constraints[i][j] == 0 && Reduced[i][j] == 0)
 				{
 					Reduced[i][j] = INF;
-					int increase = rowMin(i) + columnMin(j);
+					auto increase = rowMin(i) + columnMin(j);
 					if (increase > bestIncrease)
 					{
 						bestIncrease = increase;
 						bestPivot = make_pair(i, j);
 					}
-					Reduced[i][j] = 0.0;
+					Reduced[i][j] = 0;
 				}
 			}
 		}
@@ -95,7 +128,7 @@ struct PartialSolution
 	void Print()
 	{
 		printf("cost: %d [0", Cost);
-		for (int i = 1; i < n; i++)
+		for (size_t i = 1; i < n; i++)
 			printf("->%d", Path[i]);
 		puts("]");
 	}
@@ -105,58 +138,71 @@ struct PartialSolution
 		bitset<N> visited;
 		Path.resize(N);
 
-		int from = 0;
+		size_t from = 0;
 		visited.set(from);
 		Path[0] = from;
-		for (int i = 0; i < n; i++)
+		for (size_t i = 0; i < n - 1; i++)
 		{
-			int to = -1;
-			for (int j = 0; j < n; j++)
+			size_t to = N;
+			for (size_t j = 0; j < n; j++)
 			{
 				if (j != from && Constraints[from][j] == 1)
 				{
-					if (visited[j] || to != -1)
+					if (visited[j] || to != N)
 						return false;
 
 					to = j;
 				}
 			}
 
+			if (to == N)
+				break;
+
 			Path[i] = to;
 			from = to;
 			visited.set(to);
 		}
 
-		return visited.count() == n;
+		return from == n-1 && visited.count() == n;
 	}
 
 	void Reduce()
 	{
-		for (int i = 0; i < n; i++)
+		for (size_t i = 0; i < n; i++)
 			Reduce(ReductionType::Row, i);
 
-		for (int j = 0; j < n; j++)
+		for (size_t j = 0; j < n; j++)
 			Reduce(ReductionType::Column, j);
 	}
 
-	void Reduce(PartialSolution::ReductionType reductionType, int i)
+	void Reduce(PartialSolution::ReductionType reductionType, size_t i)
 	{
-		auto accessor = [&](int a, int b) -> int& {return reductionType == ReductionType::Row? Reduced[a][b] : Reduced[b][a]; };
+		auto kStride = reductionType == ReductionType::Row ? 1 : N;
+		
+		uint32_t m = INF;
+		for (size_t k = 0; k < n; k++)
+			m = min(m, *(&Reduced[0][0] + IK(i, k, kStride)));
 
-		int m = INF;
-		for (int j = 0; j < n; j++)
-			m = min(m, accessor(i, j));
-		for (int j = 0; j < n; j++)
-			accessor(i, j) -= m;
-		LowerBound += m;
+		for (size_t k = 0; k < n; k++)
+			*(&Reduced[0][0] + IK(i, k, kStride)) -= m;
+		LowerBoundTimesTwo += m;
 	}
 
-	PartialSolution(int n, int32_t D[N][N]) : n(n)
+	int IK(size_t i, size_t k, size_t kStride)
+	{
+		return (N + 1 - kStride)*i + kStride*k;
+	}
+
+	PartialSolution(size_t n, uint32_t D[N][N]) : n(n)
 	{
 		memcpy(Reduced, D, sizeof(Reduced[0][0]) * N * N);
 		memset(Constraints, 0, sizeof(Constraints[0][0]) * N * N);
-		for (int i = 0; i < n; i++)
+		for (size_t i = 0; i < n; i++)
+		{
 			Reduced[i][i] = INF;
+			Constraints[i][i] = -1;
+		}
+		Cost = 0;
 
 		Reduce();
 	}
@@ -167,10 +213,10 @@ struct PartialSolution
 	}
 };
 
-void branch_and_bound(int n, int32_t D[N][N])
+void branch_and_bound(size_t n, uint32_t D[N][N])
 {
 	PartialSolution bestCompleteSolution;
-	PartialSolution root(n, D);
+	PartialSolution root = PartialSolution(n, D).WithEdge(make_pair(0, n - 1), D);
 	
 	priority_queue<PartialSolution, vector<PartialSolution>, greater<PartialSolution> > Q;
 	Q.push(root);
@@ -188,16 +234,16 @@ void branch_and_bound(int n, int32_t D[N][N])
 				bestCompleteSolution.Print();
 			}
 		}
-		else if (currentSolution.LowerBound < bestCompleteSolution.Cost)
+		else if (currentSolution.LowerBoundTimesTwo / 2 < bestCompleteSolution.Cost)
 		{
 			auto pivot = currentSolution.ChoosePivotEdge();
 			auto withPivot = currentSolution.WithEdge(pivot, D);
 			auto withoutPivot = currentSolution.WithoutEdge(pivot, D);
 
-			if (withPivot.LowerBound < bestCompleteSolution.Cost)
+			if (withPivot.LowerBoundTimesTwo / 2 < bestCompleteSolution.Cost)
 				Q.push(withPivot);
 
-			if (withoutPivot.LowerBound < bestCompleteSolution.Cost)
+			if (withoutPivot.LowerBoundTimesTwo / 2 < bestCompleteSolution.Cost)
 				Q.push(withoutPivot);
 		}
 	}
@@ -205,15 +251,15 @@ void branch_and_bound(int n, int32_t D[N][N])
 
 int main()
 {
-	freopen("input.txt", "r", stdin);
+	freopen("tests/asanov/input.txt", "r", stdin);
 
-	int n;
-	int32_t D[N][N];
+	size_t n;
+	uint32_t D[N][N];
 
-	scanf("%d", &n);
-	for (int i = 0; i < n; i++)
-		for (int j = 0; j < n; j++)
-			scanf("%d", &D[i][j]);
+	scanf("%u", &n);
+	for (size_t i = 0; i < n; i++)
+		for (size_t j = 0; j < n; j++)
+			scanf("%u", &D[i][j]);
 
 	branch_and_bound(n, D);
 }
