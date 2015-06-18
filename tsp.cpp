@@ -5,6 +5,7 @@
 #include <functional>
 #include <vector>
 #include <queue>
+#include <stack>
 #include <utility>
 using namespace std;
 
@@ -38,7 +39,7 @@ struct PartialSolution
 			child.Constraints[i][k] = child.Constraints[k][j] = -1;
 			child.Reduced[i][k] = child.Reduced[k][j] = INF;
 		}
-
+		child.EnabledEdges++;
 		child.Constraints[i][j] = 1;
 		child.Constraints[j][i] = -1;
 
@@ -59,6 +60,7 @@ struct PartialSolution
 		auto i = pivot.first, j = pivot.second;
 		
 		PartialSolution child = *this;
+		child.DisabledEdges++;
 		child.Constraints[i][j] = -1;
 		child.Reduced[i][j] = INF;
 		child.Reduce(EdgeType::Outgoing, i);
@@ -148,8 +150,8 @@ struct PartialSolution
 	void Print(uint32_t D[N][N])
 	{
 		std::cout << Cost - D[n - 1][0] << std::endl;
-		for (size_t i = 1; i < n; i++)
-			std::cout << Path[i - 1] << " " << Path[i] << " " << D[Path[i - 1]][Path[i]] << std::endl;
+		//for (size_t i = 1; i < n; i++)
+		//	std::cout << Path[i - 1] << " " << Path[i] << " " << D[Path[i - 1]][Path[i]] << std::endl;
 	}
 
 	bool IsComplete()
@@ -181,6 +183,7 @@ struct PartialSolution
 	{
 	}
 
+	size_t EnabledEdges = 0, DisabledEdges = 0;
 	size_t n = 0;
 	uint32_t Cost = INF;
 	uint32_t LowerBoundTimesTwo = 0;
@@ -194,19 +197,24 @@ void branch_and_bound(size_t n, uint32_t D[N][N])
 	PartialSolution bestCompleteSolution;
 	PartialSolution root = PartialSolution(n, D).WithEdge(Edge(n - 1, 0), D);
 
-	priority_queue<PartialSolution, vector<PartialSolution>, greater<PartialSolution> > Q;
-	Q.push(root);
+	priority_queue<PartialSolution, vector<PartialSolution>, greater<PartialSolution> > right;
+	stack<PartialSolution> left;
+	left.push(root);
 
-	while (!Q.empty())
+	while (!left.empty() || !right.empty())
 	{
-		auto currentSolution = Q.top();
-		Q.pop();
-
+		auto& currentSolution = !left.empty() ? left.top() : right.top();
+		if (!left.empty())
+			left.pop();
+		else
+			right.pop();
+	
 		if (currentSolution.IsComplete())
 		{
 			if (currentSolution.Cost < bestCompleteSolution.Cost)
 			{
 				bestCompleteSolution = currentSolution;
+				bestCompleteSolution.Print(D);
 			}
 		}
 		else if (currentSolution.LowerBoundTimesTwo < bestCompleteSolution.Cost)
@@ -218,18 +226,19 @@ void branch_and_bound(size_t n, uint32_t D[N][N])
 				auto withoutPivot = currentSolution.WithoutEdge(pivot, D);
 
 				if (withPivot.LowerBoundTimesTwo < bestCompleteSolution.Cost)
-					Q.push(withPivot);
+					left.push(withPivot);
 
 				if (withoutPivot.LowerBoundTimesTwo < bestCompleteSolution.Cost)
-					Q.push(withoutPivot);
+					right.push(withoutPivot);
 			}
 		}
 	}
-	bestCompleteSolution.Print(D);
 }
 
 int main(int argc, char* argv[])
 {
+	freopen(argv[1], "r", stdin);
+	
 	size_t n;
 	uint32_t D[N][N];
 
