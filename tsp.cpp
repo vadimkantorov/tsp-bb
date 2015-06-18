@@ -10,17 +10,28 @@ using namespace std;
 
 const size_t N = 50;
 const uint32_t INF = uint32_t(1e+6);
-typedef pair < size_t, size_t > Edge;
-Edge NullEdge = make_pair(N, N);
+
+struct Edge
+{
+	int i, j;
+	enum class Type
+	{
+		Outgoing,
+		Incoming
+	};
+
+	Edge(size_t i = N, size_t j = N) : i(i), j(j)
+	{
+	}
+
+	bool IsNull()
+	{
+		return i == N && j == N;
+	}
+};
 
 struct PartialSolution
 {
-	enum class ReductionType
-	{
-		Row,
-		Column,
-	};
-
 	size_t n = 0;
 	uint32_t Cost = INF;
 	uint32_t LowerBoundTimesTwo = 0;
@@ -30,7 +41,7 @@ struct PartialSolution
 
 	PartialSolution WithEdge(Edge pivot, uint32_t D[N][N])
 	{
-		auto i = pivot.first, j = pivot.second;
+		auto i = pivot.i, j = pivot.j;
 		
 		PartialSolution child = *this;
 		child.Cost += D[i][j];
@@ -43,8 +54,8 @@ struct PartialSolution
 		child.Constraints[i][j] = 1;
 		child.Constraints[j][i] = -1;
 
-		auto subpathTo = child.TraverseSubPath(i, 1);
-		auto subpathFrom = child.TraverseSubPath(i, N);
+		auto subpathTo = child.TraverseSubPath(i, Edge::Type::Outgoing);
+		auto subpathFrom = child.TraverseSubPath(i, Edge::Type::Incoming);
 		if (subpathTo.size() + subpathFrom.size() - 1 != n)
 		{
 			child.Constraints[subpathTo.back()][subpathFrom.back()] = -1;
@@ -57,13 +68,13 @@ struct PartialSolution
 
 	PartialSolution WithoutEdge(Edge pivot, uint32_t D[N][N])
 	{
-		auto i = pivot.first, j = pivot.second;
+		auto i = pivot.i, j = pivot.j;
 		
 		PartialSolution child = *this;
 		child.Constraints[i][j] = -1;
 		child.Reduced[i][j] = INF;
-		child.Reduce(ReductionType::Row, i);
-		child.Reduce(ReductionType::Column, j);
+		child.Reduce(Edge::Type::Outgoing, i);
+		child.Reduce(Edge::Type::Incoming, j);
 
 		return child;
 	}
@@ -80,7 +91,7 @@ struct PartialSolution
 		auto columnMin = [&](size_t k) {return minStride(k, 1); };
 		
 		uint32_t bestIncrease = 0;
-		Edge bestPivot = NullEdge;
+		Edge bestPivot;
 		for (size_t i = 0; i < n; i++)
 		{
 			for (size_t j = 0; j < n; j++)
@@ -92,7 +103,7 @@ struct PartialSolution
 					if (increase > bestIncrease)
 					{
 						bestIncrease = increase;
-						bestPivot = make_pair(i, j);
+						bestPivot = Edge(i, j);
 					}
 					Reduced[i][j] = 0;
 				}
@@ -110,8 +121,9 @@ struct PartialSolution
 		puts("]");
 	}
 
-	vector<size_t> TraverseSubPath(size_t cur, int stride)
+	vector<size_t> TraverseSubPath(size_t cur, Edge::Type edgeType)
 	{
+		auto stride = edgeType == Edge::Type::Outgoing ? 1 : N;
 		vector<size_t> subpath{ cur };
 		for (size_t k = 0; k < n; k++)
 		{
@@ -136,22 +148,22 @@ struct PartialSolution
 
 	bool IsComplete()
 	{
-		Path = TraverseSubPath(0, 1);
-		return Path.size() == n + 1 && Path[n - 1] == n - 1
+		Path = TraverseSubPath(0, Edge::Type::Outgoing);
+		return Path.size() == n + 1 && Path[n - 1] == n - 1;
 	}
 
 	void Reduce()
 	{
 		for (size_t i = 0; i < n; i++)
-			Reduce(ReductionType::Row, i);
+			Reduce(Edge::Type::Outgoing, i);
 
 		for (size_t j = 0; j < n; j++)
-			Reduce(ReductionType::Column, j);
+			Reduce(Edge::Type::Incoming, j);
 	}
 
-	void Reduce(PartialSolution::ReductionType reductionType, size_t i)
+	void Reduce(Edge::Type edgeType, size_t i)
 	{
-		auto kStride = reductionType == ReductionType::Row ? 1 : N;
+		auto kStride = edgeType == Edge::Type::Outgoing ? 1 : N;
 		
 		uint32_t m = INF;
 		for (size_t k = 0; k < n; k++)
@@ -194,7 +206,7 @@ struct PartialSolution
 void branch_and_bound(size_t n, uint32_t D[N][N])
 {
 	PartialSolution bestCompleteSolution;
-	PartialSolution root = PartialSolution(n, D).WithEdge(make_pair(n - 1, 0), D);
+	PartialSolution root = PartialSolution(n, D).WithEdge(Edge(n - 1, 0), D);
 
 	priority_queue<PartialSolution, vector<PartialSolution>, greater<PartialSolution> > Q;
 	Q.push(root);
@@ -215,7 +227,7 @@ void branch_and_bound(size_t n, uint32_t D[N][N])
 		else if (currentSolution.LowerBoundTimesTwo < 2 * bestCompleteSolution.Cost)
 		{
 			auto pivot = currentSolution.ChoosePivotEdge();
-			if (pivot != NullEdge)
+			if (!pivot.IsNull())
 			{
 				auto withPivot = currentSolution.WithEdge(pivot, D);
 				auto withoutPivot = currentSolution.WithoutEdge(pivot, D);
