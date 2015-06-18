@@ -101,6 +101,7 @@ impl PartialSolution
 
 	fn new(n : usize, D : &Vec<Vec<u32>>) -> PartialSolution
 	{
+		//TODO: make sure D.clone() makes a deep copy
 		let mut res = PartialSolution {n : n, Cost : 0, LowerBoundTimesTwo : 0, Path : vec![], Constraints : vec![vec![0i8; N]; N], Reduced : D.clone()};
 
 		for i in 0..n
