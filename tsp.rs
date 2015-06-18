@@ -289,7 +289,6 @@ fn main()
 		.map(|number| number.parse().unwrap())
 		.collect())
 	.collect();
-	println!("{:?}", D);
 
 	branch_and_bound(n, &D);
 }
