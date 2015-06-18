@@ -69,9 +69,9 @@ struct PartialSolution
 
 	Edge ChoosePivotEdge()
 	{
-		auto minStride = [&](size_t k, size_t kStride) {uint32_t m = INF; for (size_t i = 0; i < n; i++) m = min(m, *(&Reduced[0][0] + IK(i, k, kStride))); return m;  };
-		auto rowMin = [&](size_t k) {return minStride(k, N); };
-		auto columnMin = [&](size_t k) {return minStride(k, 1); };
+		auto minStride = [&](size_t except, size_t k, size_t kStride) {uint32_t m = INF; for (size_t i = 0; i < n; i++) if(i != except) m = min(m, *(&Reduced[0][0] + IK(i, k, kStride))); return m;  };
+		auto rowMin = [&](size_t k, size_t except) {return minStride(except, k, N); };
+		auto columnMin = [&](size_t k, size_t except) {return minStride(except, k, 1); };
 		
 		uint32_t bestIncrease = 0;
 		Edge bestPivot = NullEdge;
@@ -81,14 +81,12 @@ struct PartialSolution
 			{
 				if (Constraints[i][j] == 0 && Reduced[i][j] == 0)
 				{
-					Reduced[i][j] = INF;
-					auto increase = rowMin(i) + columnMin(j);
+					auto increase = rowMin(i, j) + columnMin(j, i);
 					if (increase > bestIncrease)
 					{
 						bestIncrease = increase;
 						bestPivot = Edge(i, j);
 					}
-					Reduced[i][j] = 0;
 				}
 			}
 		}
@@ -236,7 +234,7 @@ int main(int argc, char* argv[])
 {
 	if (argc == 1)
 	{
-		argv = new char*[] {argv[1], "tests/asanov/input.txt"};
+		argv = new char*[] {argv[1], "tests/pskov_all/input.txt"};
 	}
 	freopen(argv[1], "r", stdin);
 
