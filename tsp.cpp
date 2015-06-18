@@ -4,8 +4,6 @@
 #include <cstdint>
 #include <functional>
 #include <vector>
-#include <bitset>
-#include <stack>
 #include <queue>
 #include <utility>
 using namespace std;
@@ -114,25 +112,16 @@ struct PartialSolution
 
 	vector<size_t> TraverseSubPath(size_t cur, int stride)
 	{
-		bitset<N> visited;
-		visited.set(cur);
 		vector<size_t> subpath{ cur };
-		bool ok = true;
-		for (size_t k = 0; ok && k < n; k++)
+		for (size_t k = 0; k < n; k++)
 		{
-			ok = true;
 			size_t next = N;
-			for (size_t i = 0; ok && i < n; i++)
+			for (size_t i = 0; i < n; i++)
 			{
 				if (*(&Constraints[0][0] + IK(cur, i, stride)) == 1)
 				{
-					if (visited[i] || next != N)
-					{
-						ok = false;
-						break;
-					}
-
 					next = i;
+					break;
 				}
 			}
 
@@ -140,7 +129,6 @@ struct PartialSolution
 				break;
 
 			subpath.push_back(next);
-			visited.set(next);
 			cur = next;
 		}
 		return subpath;
@@ -149,8 +137,7 @@ struct PartialSolution
 	bool IsComplete()
 	{
 		Path = TraverseSubPath(0, 1);
-		//return Path.back() == n - 1 && Path.size() == n;
-		return Path.size() == n + 1;
+		return Path.size() == n + 1 && Path[n - 1] == n - 1
 	}
 
 	void Reduce()
@@ -207,11 +194,9 @@ struct PartialSolution
 void branch_and_bound(size_t n, uint32_t D[N][N])
 {
 	PartialSolution bestCompleteSolution;
-	//PartialSolution root = PartialSolution(n, D).WithEdge(make_pair(n - 1, 0), D);
-	PartialSolution root = PartialSolution(n, D);
+	PartialSolution root = PartialSolution(n, D).WithEdge(make_pair(n - 1, 0), D);
 
 	priority_queue<PartialSolution, vector<PartialSolution>, greater<PartialSolution> > Q;
-	//stack<PartialSolution> Q;
 	Q.push(root);
 
 	while (!Q.empty())
