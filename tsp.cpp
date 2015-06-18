@@ -1,6 +1,6 @@
 #define _CRT_SECURE_NO_WARNINGS
 
-#include <cstdio>
+#include <iostream>
 #include <cstdint>
 #include <functional>
 #include <vector>
@@ -147,10 +147,9 @@ struct PartialSolution
 
 	void Print(uint32_t D[N][N])
 	{
-		printf("%d\n", Cost - D[n - 1][0]);
+		std::cout << Cost - D[n - 1][0] << std::endl;
 		for (size_t i = 1; i < n; i++)
-			printf("%d %d %d\n", Path[i - 1], Path[i], D[Path[i - 1]][Path[i]]);
-		printf("\n\n");
+			std::cout << Path[i - 1] << " " << Path[i] << " " << D[Path[i - 1]][Path[i]] << std::endl;
 	}
 
 	bool IsComplete()
@@ -180,7 +179,6 @@ struct PartialSolution
 
 	PartialSolution()
 	{
-
 	}
 
 	size_t n = 0;
@@ -209,10 +207,9 @@ void branch_and_bound(size_t n, uint32_t D[N][N])
 			if (currentSolution.Cost < bestCompleteSolution.Cost)
 			{
 				bestCompleteSolution = currentSolution;
-				bestCompleteSolution.Print(D);
 			}
 		}
-		else if (currentSolution.LowerBoundTimesTwo < 2 * bestCompleteSolution.Cost)
+		else if (currentSolution.LowerBoundTimesTwo < bestCompleteSolution.Cost)
 		{
 			auto pivot = currentSolution.ChoosePivotEdge();
 			if (pivot != NullEdge)
@@ -220,31 +217,26 @@ void branch_and_bound(size_t n, uint32_t D[N][N])
 				auto withPivot = currentSolution.WithEdge(pivot, D);
 				auto withoutPivot = currentSolution.WithoutEdge(pivot, D);
 
-				if (withPivot.LowerBoundTimesTwo < 2 * bestCompleteSolution.Cost)
+				if (withPivot.LowerBoundTimesTwo < bestCompleteSolution.Cost)
 					Q.push(withPivot);
 
-				if (withoutPivot.LowerBoundTimesTwo < 2 * bestCompleteSolution.Cost)
+				if (withoutPivot.LowerBoundTimesTwo < bestCompleteSolution.Cost)
 					Q.push(withoutPivot);
 			}
 		}
 	}
+	bestCompleteSolution.Print(D);
 }
 
 int main(int argc, char* argv[])
 {
-	if (argc == 1)
-	{
-		argv = new char*[] {argv[1], "tests/pskov_all/input.txt"};
-	}
-	freopen(argv[1], "r", stdin);
-
 	size_t n;
 	uint32_t D[N][N];
 
-	scanf("%u", &n);
+	std::cin >> n;
 	for (size_t i = 0; i < n; i++)
 		for (size_t j = 0; j < n; j++)
-			scanf("%u", &D[i][j]);
+			std::cin >> D[i][j];
 
 	branch_and_bound(n, D);
 }
