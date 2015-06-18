@@ -9,7 +9,7 @@
 using namespace std;
 
 const size_t N = 50;
-const uint32_t INF = uint32_t(1e+6);
+const uint32_t INF = uint32_t(1e+9);
 
 struct Edge
 {
@@ -113,12 +113,12 @@ struct PartialSolution
 		return bestPivot;
 	}
 
-	void Print()
+	void Print(uint32_t D[N][N])
 	{
-		printf("cost: %d [0", Cost);
+		printf("%d\n", Cost - D[n-1][0]);
 		for (size_t i = 1; i < n; i++)
-			printf("->%d", Path[i]);
-		puts("]");
+			printf("%d %d %d\n", Path[i-1], Path[i], D[Path[i-1]][Path[i]]);
+		printf("\n\n");
 	}
 
 	vector<size_t> TraverseSubPath(size_t cur, Edge::Type edgeType)
@@ -221,7 +221,7 @@ void branch_and_bound(size_t n, uint32_t D[N][N])
 			if (currentSolution.Cost < bestCompleteSolution.Cost)
 			{
 				bestCompleteSolution = currentSolution;
-				bestCompleteSolution.Print();
+				bestCompleteSolution.Print(D);
 			}
 		}
 		else if (currentSolution.LowerBoundTimesTwo < 2 * bestCompleteSolution.Cost)
@@ -242,9 +242,13 @@ void branch_and_bound(size_t n, uint32_t D[N][N])
 	}
 }
 
-int main()
+int main(int argc, char* argv[])
 {
-	freopen("tests/asanov/input.txt", "r", stdin);
+	if (argc == 1)
+	{
+		argv = new char*[] {argv[1], "tests/asanov/input.txt"};
+	}
+	freopen(argv[1], "r", stdin);
 
 	size_t n;
 	uint32_t D[N][N];
