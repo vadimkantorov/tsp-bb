@@ -1,4 +1,4 @@
-# Implementation of branch-and-bound for TSP in Rust and C++
+# Branch-and-bound for Traveling Salesman Problem (TSP) in Rust and C++
 
 The implementation follows division of search space by inclusion/exclusion of edges selected by a criterion that maximizes early cuts of subspaces of the search space.
 
