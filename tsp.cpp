@@ -197,13 +197,13 @@ void branch_and_bound(size_t n, uint32_t D[N][N])
 	PartialSolution bestCompleteSolution;
 	PartialSolution root = PartialSolution(n, D).WithEdge(Edge(n - 1, 0), D);
 
-	priority_queue<PartialSolution, vector<PartialSolution>, greater<PartialSolution> > right;
-	stack<PartialSolution> left;
+	static priority_queue<PartialSolution, vector<PartialSolution>, greater<PartialSolution> > right;
+	static stack<PartialSolution> left;
 	left.push(root);
 
 	while (!left.empty() || !right.empty())
 	{
-		auto& currentSolution = !left.empty() ? left.top() : right.top();
+		auto currentSolution = !left.empty() ? left.top() : right.top();
 		if (!left.empty())
 			left.pop();
 		else
