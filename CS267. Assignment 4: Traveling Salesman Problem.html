@@ -1,0 +1,375 @@
+<title>CS267. Assignment 4: Traveling Salesman Problem</title>
+<h1>CS267. Assignment 4: Traveling Salesman Problem</h1> 
+<h1>Due: April 1, 1996</h1>
+
+<h2>Introduction</h2>
+
+You will try to solve the 
+<b> Traveling Salesman Problem (TSP)</b>
+in parallel. You are given a list of n cities along with the distances 
+between each pair of cities. The goal is to find a tour which starts
+at the first city, visits each city exactly once and returns to the first city,
+such that the distance traveled is as small as possible. This problem is
+known to be 
+NP-complete
+, i.e. no serial algorithm exists that runs in time
+polynomial in n, only in time exponential in n, and it is widely believed
+that no polynomial time algorithm exists. In practice, we want to compute
+an <I>approximate solution</I>, i.e. a single tour whose length is as short as
+possible, in a given amount of time.
+
+<p>
+More formally, we are given a graph G=(N,V,W) consisting of a set N of n nodes 
+(or cities), a set of edges V = {(i,j)} connecting cities, and a set of
+nonnegative weights W = {w(i,j)} giving the length of edge (i,j) (distance from
+city i to city j). The graph is <I>directed</I>, so that an edge (i,j)
+may only be traversed in the direction from i to j, and edge (j,i) may or
+may not exist. Similarly, w(i,j) does not necessarily equal w(j,i), if both
+edges exist.
+
+<p>
+There are a great many algorithms for this important problem, some of which
+take advantage of special properties like <I>symmetry</I> (edges (i,j) and
+(j,i) always exist or do not exist simultaneously, and w(i,j) = w(j,i))
+and the <I>triangle inequality</I> (w(i,j) <= w(i,k) + w(k,j) for all i,j,k).
+In this assignment we assume none of these properties hold. For simplicity,
+though, we assume all edges (i,j) exist, and all w(i,j) are positive
+integers (note that setting some w(i,j) to be very large effectively
+excludes it from appearance in a solution). 
+
+<p>
+For an interesting graphical
+demonstration of a TSP problem with US cities (where symmetry and the
+triangle inequality both hold), start up matlab, and then
+<menu>
+<li> type "demo"
+<li> click on "continue"
+<li> click on "Fun/Extras / Visit"
+<li> click on "Miscellaneous / Select a Demo"
+<li> click on "Salesman"
+<li> choose a number of cities n by clicking
+<li> click on start
+<li> The algorithm will continue to search for a better solution
+until you click on "stop".
+</menu>
+
+
+<p>
+We will describe a sequence of solutions, in pseudo-code, starting from a
+naive <I>exhaustive search algorithm</I>, to a naive 
+<I>branch-and-bound algorithm</I>, to a more sophisticated branch-and-bound
+algorithm. 
+
+<p>
+For your parallel implementation you should use the <I>task queue</I>
+which is part of the <I>Multipol</I> library of distributed data
+structured produced by Prof. Yelick and her students. Multipol stands for
+Multiported Object Library, about which you will hear more in lecture.
+The task queue is used for <I>dynamic load balancing</I>, or distributing
+work among processors to keep them all gainfully employed, in the situation
+where the workload is generated unpredictably at run-time, precluding any
+static preassignment of work to processors.
+
+<p>
+A sample application which uses the task queue and Split-C
+to solve the ever-popular N-Queens problem may be found in
+/usr/castle/share/proj/cpwen/queen.
+You may copy this to your own directory.
+To make the program simply type "gmake".
+To run the program. type "queen" followed by the number of processors
+to use. Task queue documentation will be forthcoming soon.
+
+<p>
+Your assignment is
+<menu>
+<li> Use the task queue to implement either the naive or the sophisticated
+     branch-and-bound algorithm, or any other interesting algorithm you
+     may choose.
+<li> Organize the code so that it may be stopped at any time, and produce the
+     best solution found so far (it may be easiest to print the best
+     solution every few seconds). Such an algorithm is called an
+     <I>anytime</I> algorithm.
+<li> Prepare to race your classmates on a problem supplied by us. You will
+     get x minutes of dedicated machine time to produce the best solution
+     you can.  May the best team win!
+</menu>
+
+<h2>Naive Exhaustive-Search for TSP</h2>
+
+Let the nodes N = {1, 2, ... , n}. The following algorithm generates
+all possible solutions, and picks the shortest. S is an ordered set which
+includes a partial path (ordered list of k integers) and the sum of
+its edge weights w: S = (k, [i1, i2, ... ,ik], w)
+
+<pre>
+     Exhaustive Search Solution of TSP
+     
+     w = w(1,2) + w(2,3) + w(3,4) + ... + w(n-1,n) + w(n,1)
+     Best_S_so_far = (  n, [ 1, 2, 3, ... , n-1, n ], w )
+     S = ( 1, [ 1 ], 0 )
+     Search( S, Best_S_so_far )
+     print Best_S_so_far
+
+     procedure Search( S, Best_S_so_far )
+
+        let ( k, [ i1, i2, ... , ik ], w ) = S
+        let ( n, [ i1B, i2B, ... , inB ], wB ) = Best_S_so_far 
+        if k = n then
+            new_w = w + w(ik,i1)
+            if new_w < wB then
+               Best_S_so_far = ( k, [ i1, i2, ... , ik ], new_w )
+            end if
+        else
+            for all j not in [ i1, i2, ... , ik ]
+               new_w = w + w(ik,j)
+               New_S = ( k+1, [ i1, i2, ... , ik, j ], new_w )
+               Search( New_S, Best_S_so_far )
+            end for
+        endif
+        return
+        end
+</pre>
+<p>
+This algorithm searches all (n-1)! possible paths starting at 1, and
+keeps the best one. There is a great deal of parallelism,
+because after k recursive call to Search, there are (n-1)*(n-2)*...*(n-k)
+independent subtrees to search, which can be farmed out to as many
+processors. Since subtrees are all equally large, the load balance
+is perfect.
+
+<h2>Naive Branch-and-Bound for TSP</h2>
+
+A simple improvement on the last algorithm <I>prunes</I> the search
+tree by observing that if a partial tour is already longer than the
+best solution found so far, there is no reason to continue searching
+that path.
+
+<pre>
+     Naive Branch-and-Bound Solution of TSP
+     
+     w = w(1,2) + w(2,3) + w(3,4) + ... + w(n-1,n) + w(n,1)
+     Best_S_so_far = (  n, [ 1, 2, 3, ... , n-1, n ], w )
+     S = ( 1, [ 1 ], 0 )
+     Search( S, Best_S_so_far )
+     print Best_S_so_far
+
+     procedure Search( S, Best_S_so_far )
+
+        let ( k, [ i1, i2, ... , ik ], w ) = S
+        let ( n, [ i1B, i2B, ... , inB ], wB ) = Best_S_so_far
+        if k = n then
+            new_w = w + w(ik,i1)
+            if new_w < wB then
+               Best_S_so_far = ( k, [ i1, i2, ... , ik ], new_w )
+            end if
+        else
+            for all j not in [ i1, i2, ... , ik ]
+               new_w = w + w(ik,j)
+               if new_w < wB then
+                   New_S = ( k+1, [ i1, i2, ... , ik, j ], new_w )
+                   Search( New_S, Best_S_so_far )
+               end if
+            end for
+        endif
+        return
+        end
+</pre>
+
+<p>
+A sequential version of this algorithm may be viewed in 
+/usr/castle/share/proj/cpwen/tsp. You may copy this to your own directory.
+To make, type "gmake". To run, type "tsp" followed by the maximum
+number of search nodes (i.e., recursive calls to tsp).
+
+<p>
+Now the search tree is not longer perfectly balanced, with some
+subtrees being pruned away. This makes load balancing more difficult.
+Statically assignment subtrees of the search tree to processors as
+for the first algorithm could lead to some processors being idle, while
+others have all the work to do. This requires dynamic load balancing,
+for which you can use the task queue in Multipol.
+
+<h2>A Better Branch and Bound Algorithm for TSP</h2>
+
+The following discussion is taken from "Combinatorial Algorithms:
+Theory and Practice", by Reingold, Nievergelt and Deo.
+Another strategy for searching the solution space is to repeatedly
+divide it into two parts: those with a given edge and those without
+the edge.  The search tree would unfold as follows:
+<pre>
+                        -----------
+                       | all solns | 
+                        -----------
+                        /         \
+        ----------------           -----------------
+       | solns with e_i |         | solns w/out e_i | 
+        ----------------           -----------------
+               /      \                 /        \
+    -----------   ----------   ----------   -----------
+   | with e_j | | w/out e_j | | with e_k | | w/out e_k | 
+    -----------   ----------   ----------   -----------
+</pre>
+
+Three questions need to be addressed: 1) How do we bound the weight of
+the solutions in each subtree?  2) How is the set of solutions
+represented?  3) How do we choose the splitting edge at a given node
+in the search space?
+
+<p>
+<b>Bounding the solutions: </b> 
+Assume the input is given as a dense adjacency matrix.  We will put
+infinities, rather than zeros on the diagonal to avoid traversing
+these self-edges.
+
+<pre>
+	  i\j	1     2     3     4     5     6     7
+            \ ________________________________________
+	1    |Inf     3    93    13    33     9    57
+	2    |  4   Inf    77    42    21    16    34
+	3    | 45    17   Inf    36    16    28    25
+	4    | 39    90    80   Inf    56     7    91
+	5    | 28    46    88    33   Inf    25    57
+	6    |  3    88    18    46    92   Inf     7
+	7    | 44    26    33    27    84    39   Inf
+</pre>
+
+We can subtract a constant from a given row or column, as long
+as the values remain non-negative.  This changes the weight of each 
+tour, but not the set of legal tours or their relative weights.
+We therefore normalize the matrix by subtracting the minimum value 
+in each row from the row and the minimum value of each column from 
+the column.  This results in a matrix with at least one zero in 
+every row and column.
+
+<pre>
+	  i\j	1     2     3     4     5     6     7
+            \ ________________________________________
+	1    |Inf     0    83     9    30     6    50
+	2    |  0   Inf    66    37    17    12    26
+	3    | 29     1   Inf    19     0    12     5
+	4    | 32    83    66   Inf    49     0    80
+	5    |  3    21    56     7   Inf     0    28
+	6    |  0    85     8    42    89   Inf     0
+	7    | 18     0     0     0    58    13   Inf
+</pre>
+
+Any solution must use one entry from every row and every
+column, so the sum of the values we just subtracted is a 
+lower bound on the weight of solution.  In this case, we 
+subtracted [3 4 16 7 25 3 26] from the rows and then 
+[0 0 7 1 0 0 4] from the columns, so the lower bound on the weight
+of any solution is 96. 
+
+We can now define a search tree in which each node represents
+a set of solutions along with a lower bound on those solutions. 
+
+<p>
+<b>Representing the set of solutions:</b> The adjacency matrix can be
+used to represent the set of solutions.  When an edge is chosen for the
+solution, the row and column containing that edge is deleted.  When
+an edge is eliminated from the solution, its entry is changed to
+infinity so that it will never be chosen.
+
+In the above example, assume we choose to split the search space on
+the edge from 4 to 6.
+For the <i>right subtree</i>, which represents
+all solutions <I>not</I> containing (4,6), 
+we replace the (4,6) entry by infinity.
+The minimum value in row 4 is now 32, so we can renormalize the
+matrix and improve the lower bound to 96+32 = 128.  Column 6 has
+another 0 entry, so it remains unchanged.  The matrix for the
+right subtree is:
+<pre>
+	  i\j	1     2     3     4     5     6     7
+            \ ________________________________________
+	1    |Inf     0    83     9    30     6    50
+	2    |  0   Inf    66    37    17    12    26
+	3    | 29     1   Inf    19     0    12     5
+	4    |  0    51    34   Inf    17   Inf    48
+	5    |  3    21    56     7   Inf     0    28
+	6    |  0    85     8    42    89   Inf     0
+	7    | 18     0     0     0    58    13   Inf
+</pre>
+
+The <i>left subtree</i> represents all solutions containing (4,6).  We
+therefore delete row 4 and column 6 from the matrix and renormalize.
+In addition, since we have used edge (4,6), edge (6,4) is no longer
+usable, so we replace the (6,4) with infinity.  (In general, the
+insertion of infinities is slightly more complicated, as discussed
+below.)  The matrix can now be renormalized, in this case by
+subtracting 3 from the row with i=5 (now the 4th row in the smaller
+matrix), yielding a lower bound of 96+3=99 and the matrix:
+
+<pre>
+	  i\j	1     2     3     4     5     7
+            \ __________________________________
+	1    |Inf     0    83     9    30    50
+	2    |  0   Inf    66    37    17    26
+	3    | 29     1   Inf    19     0     5
+	5    |  0    18    53     4   Inf    25
+	6    |  0    85     8   Inf    89     0
+	7    | 18     0     0     0    58   Inf
+</pre>
+
+The process outlined so far can be used by repeatedly following these
+steps.  Following the left branches we are guaranteed to reach some
+solution in n levels.  Following the right branch, we will eventually
+have a matrix full of infinities, at which point the lower bound (if
+we kept searching) would become infinity.  Pruning is done by eliminating
+any subtrees whose lower bound is larger than the best lower bound seen
+so far for a complete solution.  
+
+<p>
+<b>Choice of the splitting edge:</b> 
+In general, the right branches represent a larger set of solutions than
+the left branches.  Therefore, in choosing the splitting edge, we look
+for something that will raise the lower bound of the right-hand subtree
+as much as possible.  In the example, edge (4,6) was chosen because its 
+value was zero and the next larger value in row 4 was 32.  There are
+other zero entries in the matrix, for example, (3,5), but the improvement
+in the lower bound for that case would have been only 1 (for row 3) plus 
+17 (for column 5).  Therefore, the general rule is to search for the zero
+entry at (i,j) that maximizes the increase in the lower bound (largest
+sum of minimum in row i and minimum in column j, not counting the 
+zero at (i,j)).
+
+<p>
+<b>Insertion of infinities in left-branches:</b> When expanding a left
+branch in the search tree for edge (i,j), we noted that edge (j,i)
+should be made infinity.  In general, we are trying to avoid the
+creation of <i>non-covering cycles</i> in the tour, i.e., cycles that
+traverse only a subset of the nodes.  For the example above, assume
+that the left-most search path unfolds with the following edge splits:
+(4,6), (3,5), and (2,1).  At this point the partial solution contains
+three disconnected paths; all cycles were prevented by marking (6,4),
+(5,3), and (1,2) as infinity.
+
+<pre>
+                              -----------
+                             | all solns | 
+                              -----------
+                               /         \
+                 ------------             -------------
+                 | with (4,6)|            | w/out (4,6)| 
+                 ------------             -------------
+                  /        \
+       ------------         -------------
+       | with (3,5)|        | w/out (3,5)| 
+       ------------         -------------
+          /        \
+ ------------       ------------
+ | with (2,1)|     | w/out (2,1)| 
+ ------------       ------------
+</pre>
+
+The next choice of splitting edge is (1,4), so according to our above
+rule (4,1) should be changed to infinity.  However, at this point the
+adjacency matrix does not contain a row for 4, since it was removed
+with the (4,6) step.  Moreover, the partial solution is now: 2-1-4-6 and
+3-5.  If (6,2) were now added, we would have a non-covering cycle, so
+we need to change the (6,2) entry to Inf.
+Thus, the general rule for inserting infinities on left-branches is to
+construct the subpaths that exist in the partial solution and remove
+any edges from the end to beginning of each subpath by replacing them
+with infinities.
+
